@@ -1,0 +1,71 @@
+name: Validar Proposta (kit)
+
+# Workflow reutilizável. Chamado pelos templates de disciplina via:
+#   jobs:
+#     validar-proposta:
+#       uses: profBruno-UFC-Qx/kit-projeto-final/.github/workflows/validar-proposta.yml@main
+
+on:
+  workflow_call:
+
+jobs:
+  validar-proposta:
+    name: validar-proposta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar PROPOSTA.md
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          PROPOSTA="PROPOSTA.md"
+
+          if [ ! -f "$PROPOSTA" ]; then
+            echo "❌ Não encontrei $PROPOSTA na raiz do repositório."
+            exit 1
+          fi
+
+          falhou=0
+
+          placeholder() {
+            if grep -qF "$1" "$PROPOSTA"; then
+              echo "❌ Placeholder ainda presente: \"$1\""
+              falhou=1
+            fi
+          }
+
+          secao_obrigatoria() {
+            if ! grep -qF "$1" "$PROPOSTA"; then
+              echo "❌ Seção obrigatória removida ou renomeada: \"$1\""
+              falhou=1
+            fi
+          }
+
+          # --- placeholders originais do template que precisam ser substituídos ---
+          placeholder "NOME DO PROJETO"
+          placeholder "Breve descrição do que o seu projeto faz."
+          placeholder "Matrícula, nome e curso dos participantes."
+          placeholder "Descrever o objetivo de geral do projeto"
+          placeholder "Público-alvo do projeto"
+          placeholder "Descreva o impacto esperado do projeto em relação ao público alvo"
+          placeholder "Informe aqui os tipos de usuário que irão interagir com a aplicação"
+          placeholder "Descreve ou liste brevemente as principais funcionalidades"
+          placeholder "Liste as principais entidades do sistema."
+
+          # --- seções que precisam continuar existindo (estrutura da proposta) ---
+          secao_obrigatoria "Membros da equipe"
+          secao_obrigatoria "Objetivo Geral"
+          secao_obrigatoria "Público-Alvo"
+          secao_obrigatoria "Impacto Esperado"
+          secao_obrigatoria "Papéis ou tipos de usuário da aplicação"
+          secao_obrigatoria "Principais funcionalidades da aplicação"
+          secao_obrigatoria "Entidades ou tabelas do sistema"
+
+          if [ "$falhou" -ne 0 ]; then
+            echo ""
+            echo "A proposta ainda não está pronta para revisão. Preencha os itens acima e atualize o PR."
+            exit 1
+          fi
+
+          echo "✅ Proposta passou na validação mínima."

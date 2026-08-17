@@ -1,0 +1,68 @@
+name: Validar Entrega (kit)
+
+# Workflow reutilizável. Chamado pelos templates de disciplina via:
+#   jobs:
+#     validar-entrega:
+#       uses: profBruno-UFC-Qx/kit-projeto-final/.github/workflows/validar-entrega.yml@main
+#
+# Só valida as seções GENÉRICAS de ENTREGA.md (antes do marcador
+# "<!-- kit:fim-secoes-genericas -->"). O que vem depois do marcador é
+# específico de cada disciplina e não é verificado aqui.
+
+on:
+  workflow_call:
+
+jobs:
+  validar-entrega:
+    name: validar-entrega
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar ENTREGA.md
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          ENTREGA="ENTREGA.md"
+          MARCADOR="<!-- kit:fim-secoes-genericas -->"
+
+          if [ ! -f "$ENTREGA" ]; then
+            echo "❌ Não encontrei $ENTREGA na raiz do repositório."
+            exit 1
+          fi
+
+          GENERICO=$(awk -v marcador="$MARCADOR" 'index($0, marcador) { exit } { print }' "$ENTREGA")
+
+          falhou=0
+
+          placeholder() {
+            if printf '%s' "$GENERICO" | grep -qF "$1"; then
+              echo "❌ Placeholder ainda presente: \"$1\""
+              falhou=1
+            fi
+          }
+
+          secao_obrigatoria() {
+            if ! printf '%s' "$GENERICO" | grep -qF "$1"; then
+              echo "❌ Seção obrigatória removida ou renomeada: \"$1\""
+              falhou=1
+            fi
+          }
+
+          placeholder "Descreva os pré-requisitos (linguagem/SDK e versão, ferramentas necessárias) e o passo a passo completo para compilar e rodar o projeto localmente."
+          placeholder "Informe login e senha (ou instrução equivalente) para cada papel de usuário da aplicação. Se o projeto não possui autenticação, indique explicitamente \"Não se aplica\" e explique por quê."
+          placeholder "Você usou alguma ferramenta de IA (ex: ChatGPT, Claude, GitHub Copilot) no desenvolvimento deste projeto? Se sim, indique qual(is) ferramenta(s), explique como você a utilizou e como ela foi capaz de ajudá-lo. Se não usou, indique \"Não utilizei\"."
+          placeholder "Descreva as principais dificuldades técnicas ou de organização enfrentadas pela equipe durante o desenvolvimento."
+
+          secao_obrigatoria "Como executar o projeto"
+          secao_obrigatoria "Credenciais de acesso para teste"
+          secao_obrigatoria "Uso de ferramentas de Inteligência Artificial"
+          secao_obrigatoria "Maiores dificuldades encontradas"
+
+          if [ "$falhou" -ne 0 ]; then
+            echo ""
+            echo "A entrega final ainda não está completa. Preencha os itens acima e atualize o PR."
+            exit 1
+          fi
+
+          echo "✅ Entrega passou na validação mínima."
