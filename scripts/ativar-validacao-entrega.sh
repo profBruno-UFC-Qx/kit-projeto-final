@@ -26,8 +26,11 @@ source "$CONFIG"
 
 : "${ORG:?defina ORG em $CONFIG}"
 : "${PREFIXO_REPO:?defina PREFIXO_REPO em $CONFIG}"
-CHECK_PROPOSTA="${CHECK_PROPOSTA:-validar-proposta}"
-CHECK_ENTREGA="${CHECK_ENTREGA:-validar-entrega}"
+# Nomes de check-run de um job que chama um workflow reutilizável seguem
+# o formato "<job do chamador> / <job do workflow chamado>" (confirmado
+# empiricamente), não só o id do job.
+CHECK_PROPOSTA="${CHECK_PROPOSTA:-validar-proposta / validar-proposta}"
+CHECK_ENTREGA="${CHECK_ENTREGA:-validar-entrega / validar-entrega}"
 
 if [ ! -f "$CSV" ]; then
   echo "Arquivo não encontrado: $CSV"

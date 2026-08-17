@@ -9,7 +9,13 @@
 #   ORG            (ex: profBruno-UFC-Qx)
 #   TEMPLATE_REPO  (ex: profBruno-UFC-Qx/qxd0020-projeto-final)
 #   PREFIXO_REPO   (ex: qxd0020)
-#   CHECK_PROPOSTA (nome do check exigido desde a criação; padrão: validar-proposta)
+#   CHECK_PROPOSTA (nome do check exigido desde a criação; padrão:
+#                   "validar-proposta / validar-proposta" — o nome do
+#                   check-run de um job que chama um workflow reutilizável
+#                   é "<job do chamador> / <job do workflow chamado>", não
+#                   só o id do job. Confirmado empiricamente; se você
+#                   renomear o job no template ou no kit, o valor aqui
+#                   precisa acompanhar.
 #
 # CSV esperado (cabeçalho incluso): tema,usuarios_github
 #   usuarios_github: usuários do GitHub separados por ";"
@@ -34,7 +40,7 @@ source "$CONFIG"
 : "${ORG:?defina ORG em $CONFIG}"
 : "${TEMPLATE_REPO:?defina TEMPLATE_REPO em $CONFIG}"
 : "${PREFIXO_REPO:?defina PREFIXO_REPO em $CONFIG}"
-CHECK_PROPOSTA="${CHECK_PROPOSTA:-validar-proposta}"
+CHECK_PROPOSTA="${CHECK_PROPOSTA:-validar-proposta / validar-proposta}"
 
 if [ ! -f "$CSV" ]; then
   echo "Arquivo não encontrado: $CSV"
