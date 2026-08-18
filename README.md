@@ -30,16 +30,15 @@ por cada disciplina, no próprio template dela.
 - `formulario-google-forms.md` — especificação dos campos do formulário
   de coleta de equipes
 - `config-exemplo.env` — modelo do arquivo de configuração por disciplina
+- `NOVA-DISCIPLINA.md` — explicação do fluxo completo + passo a passo
+  para conectar uma disciplina nova ao kit
 
-## Configuração única (por disciplina, ao adotar o kit)
+## Adicionando uma disciplina nova
 
-1. Habilite, nas configurações deste repositório
-   (Settings → Actions → General → Access), o acesso aos workflows
-   reutilizáveis para toda a organização — necessário para que os
-   templates de outras disciplinas (também privados/públicos na mesma
-   org) consigam referenciar os workflows daqui.
+Passo a passo completo (e a explicação do porquê do fluxo ser como é) em
+[`NOVA-DISCIPLINA.md`](NOVA-DISCIPLINA.md). Resumo rápido:
 
-2. No template da disciplina (ex: `qxd0020-projeto-final`):
+1. No template da disciplina (ex: `qxd0020-projeto-final`):
    - Copie `templates/PROPOSTA.md` para a raiz como `PROPOSTA.md`
    - Copie `templates/ENTREGA.md` para a raiz como `ENTREGA.md`, e
      adicione abaixo do marcador `<!-- kit:fim-secoes-genericas -->` as
@@ -63,6 +62,9 @@ por cada disciplina, no próprio template dela.
        uses: profBruno-UFC-Qx/kit-projeto-final/.github/workflows/validar-proposta.yml@main
    ```
    (o mesmo padrão vale para `validar-entrega.yml`)
+
+2. Crie um GitHub Project (board) e cole o número em
+   `adicionar-ao-board.yml`.
 
 3. Crie uma pasta de gestão para a disciplina (fora do template, ex:
    `GestaoQXD0020/`) com uma cópia de `config-exemplo.env` preenchida e
