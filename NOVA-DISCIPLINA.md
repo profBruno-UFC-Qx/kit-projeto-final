@@ -31,6 +31,14 @@ Aluno                                          Professor
   |                        (fim do semestre: clonar-tudo.sh)
 ```
 
+Depois de criar os repositórios (e de novo perto do prazo final), rode
+`verificar-colaboradores.sh` para conferir se todo mundo tem acesso de
+verdade: ele distingue convite pendente (usuário existe, não aceitou —
+cobrar) de usuário não encontrado (typo/errado no CSV — corrigir e rodar
+`criar-repos.sh` de novo). Resposta atrasada do formulário também usa
+`criar-repos.sh`: adicione a equipe ao CSV completo e rode de novo —
+repositórios já existentes são detectados e pulados, só o novo é criado.
+
 O board do GitHub Project de cada disciplina reflete esse estado sozinho:
 todo PR de proposta é adicionado automaticamente ao abrir, e o workflow
 nativo do Projects marca como concluído quando o PR é mesclado — sem
@@ -209,4 +217,5 @@ formulário e o seu roster.
 
 ```bash
 ./scripts/criar-repos.sh --config Gestao<DISCIPLINA>/<prefixo>.env Gestao<DISCIPLINA>/equipes.csv
+./scripts/verificar-colaboradores.sh --config Gestao<DISCIPLINA>/<prefixo>.env Gestao<DISCIPLINA>/equipes.csv
 ```

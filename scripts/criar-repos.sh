@@ -18,7 +18,14 @@
 #                   precisa acompanhar.
 #
 # CSV esperado (cabeçalho incluso): tema,usuarios_github
-#   usuarios_github: usuários do GitHub separados por ";"
+#   usuarios_github: usuários do GitHub separados por ";", cada um como
+#   "usuario" ou como link do perfil ("github.com/usuario" ou
+#   "https://github.com/usuario") — os dois formatos são aceitos.
+#
+# Reexecutável: se um repositório do CSV já existir, ele é pulado (sem
+# recriar nem duplicar colaboradores/proteção). Isso permite adicionar
+# uma equipe atrasada rodando o script de novo com o CSV atualizado
+# (todas as equipes + a nova), sem precisar de um caminho separado.
 
 set -uo pipefail
 
@@ -61,6 +68,14 @@ slugificar() {
         -e 's/[çÇ]/c/g' -e 's/[ñÑ]/n/g' \
     | tr '[:upper:]' '[:lower:]' \
     | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+}
+
+extrair_usuario() {
+  # Aceita tanto "usuario" quanto "github.com/usuario" (com ou sem
+  # protocolo/www/barra final) e devolve só o usuário.
+  printf '%s' "$1" \
+    | xargs \
+    | sed -E 's#^(https?://)?(www\.)?github\.com/##i; s#/+$##'
 }
 
 temas=()
@@ -118,15 +133,21 @@ for i in "${!temas[@]}"; do
   echo ""
   echo "== Criando $repo =="
 
-  gh repo create "$repo" \
+  if ! gh repo create "$repo" \
     --template "$TEMPLATE_REPO" \
     --public \
-    --description "$tema" \
-    || { echo "❌ Falha ao criar $repo, pulando."; continue; }
+    --description "$tema"; then
+    if gh repo view "$repo" >/dev/null 2>&1; then
+      echo "  ℹ️  $repo já existe, pulando (equipe adicionada em execução anterior)."
+    else
+      echo "❌ Falha ao criar $repo, pulando."
+    fi
+    continue
+  fi
 
   IFS=';' read -ra usuarios <<< "${usuarios_por_equipe[$i]}"
   for usuario in "${usuarios[@]}"; do
-    usuario_limpo=$(printf '%s' "$usuario" | xargs)
+    usuario_limpo=$(extrair_usuario "$usuario")
     [ -z "$usuario_limpo" ] && continue
     echo "  adicionando colaborador: $usuario_limpo"
     gh api "repos/$repo/collaborators/$usuario_limpo" -X PUT -f permission=push \
@@ -152,6 +173,7 @@ done
 
 echo ""
 echo "Concluído. A branch main de cada repositório exige revisão do"
-echo "code owner + o check '$CHECK_PROPOSTA'. Quando chegar perto do prazo"
-echo "de entrega final, rode ativar-validacao-entrega.sh para também"
-echo "exigir o check de entrega."
+echo "code owner + o check '$CHECK_PROPOSTA'. Rode verificar-colaboradores.sh"
+echo "para conferir se todos os usuários do GitHub foram adicionados"
+echo "corretamente. Quando chegar perto do prazo de entrega final, rode"
+echo "ativar-validacao-entrega.sh para também exigir o check de entrega."

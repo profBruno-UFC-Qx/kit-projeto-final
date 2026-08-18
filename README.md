@@ -24,6 +24,9 @@ por cada disciplina, no próprio template dela.
 - `scripts/criar-repos.sh` — cria os repositórios das equipes a partir
   do template da disciplina, adiciona colaboradores, protege a `main`
   (aprovação do professor + check de proposta obrigatórios)
+- `scripts/verificar-colaboradores.sh` — relata usuários com convite
+  pendente (não aceito) ou não encontrados (typo/inexistente), rodado
+  depois de `criar-repos.sh` e de novo perto do prazo final
 - `scripts/ativar-validacao-entrega.sh` — roda perto do prazo final,
   passa a exigir também o check de entrega para mesclar na `main`
 - `scripts/clonar-tudo.sh` — clona/atualiza em lote no fim do semestre
@@ -74,9 +77,14 @@ Passo a passo completo (e a explicação do porquê do fluxo ser como é) em
 
 ```
 ./scripts/criar-repos.sh --config GestaoQXD0020/qxd0020.env GestaoQXD0020/equipes.csv
+./scripts/verificar-colaboradores.sh --config GestaoQXD0020/qxd0020.env GestaoQXD0020/equipes.csv
 # ... alunos abrem PR de proposta, professor revisa e aprova ...
 # ... perto do prazo final ...
 ./scripts/ativar-validacao-entrega.sh --config GestaoQXD0020/qxd0020.env GestaoQXD0020/equipes.csv
 # ... alunos abrem PR de entrega, professor revisa e aprova ...
 ./scripts/clonar-tudo.sh --config GestaoQXD0020/qxd0020.env GestaoQXD0020/equipes.csv ./entregas-2026-2
 ```
+
+Resposta atrasada do formulário: adicione a equipe ao `equipes.csv`
+completo (todas as equipes + a nova) e rode `criar-repos.sh` de novo —
+repositórios já existentes são detectados e pulados automaticamente.
