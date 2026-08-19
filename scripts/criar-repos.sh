@@ -17,10 +17,15 @@
 #                   renomear o job no template ou no kit, o valor aqui
 #                   precisa acompanhar.
 #
-# CSV esperado (cabeçalho incluso): tema,usuarios_github
+# CSV esperado: precisa ter no cabeçalho as colunas "tema" e
+#   "usuarios_github" (em qualquer posição/ordem). Outras colunas (ex:
+#   "disciplina", vindas de uma planilha exportada com mais campos do que
+#   o necessário) são ignoradas.
 #   usuarios_github: usuários do GitHub separados por ";", cada um como
 #   "usuario" ou como link do perfil ("github.com/usuario" ou
-#   "https://github.com/usuario") — os dois formatos são aceitos.
+#   "https://github.com/usuario") — os dois formatos são aceitos. Campos
+#   vazios entre ";" (ex: equipe menor que o número de colunas do
+#   formulário) são ignorados.
 #
 # Reexecutável: se um repositório do CSV já existir, ele é pulado (sem
 # recriar nem duplicar colaboradores/proteção). Isso permite adicionar
@@ -54,6 +59,26 @@ if [ ! -f "$CSV" ]; then
   exit 1
 fi
 
+indice_coluna() {
+  # Índice (0-based) da coluna $1 no cabeçalho do CSV, ou -1 se não achar.
+  local procurado="$1" i=0 nome
+  local -a colunas
+  IFS=',' read -ra colunas < <(head -n 1 "$CSV")
+  for nome in "${colunas[@]}"; do
+    nome=$(printf '%s' "$nome" | xargs | tr '[:upper:]' '[:lower:]')
+    [ "$nome" = "$procurado" ] && { echo "$i"; return; }
+    i=$((i + 1))
+  done
+  echo -1
+}
+
+IDX_TEMA=$(indice_coluna "tema")
+IDX_USUARIOS=$(indice_coluna "usuarios_github")
+if [ "$IDX_TEMA" -lt 0 ] || [ "$IDX_USUARIOS" -lt 0 ]; then
+  echo "O cabeçalho do CSV precisa ter as colunas 'tema' e 'usuarios_github' (outras colunas são ignoradas)."
+  exit 1
+fi
+
 slugificar() {
   # Mapeamento explícito de acentos em vez de `iconv //TRANSLIT`, cujo
   # comportamento varia entre libiconv (macOS) e glibc (Linux) e pode
@@ -82,7 +107,10 @@ temas=()
 slugs=()
 usuarios_por_equipe=()
 
-while IFS=',' read -r tema usuarios; do
+while IFS=',' read -r -a campos; do
+  [ "${#campos[@]}" -eq 0 ] && continue
+  tema="${campos[$IDX_TEMA]:-}"
+  usuarios="${campos[$IDX_USUARIOS]:-}"
   [ -z "$tema" ] && continue
   slug=$(slugificar "$tema")
   temas+=("$tema")
@@ -111,12 +139,26 @@ if [ "$duplicados" -ne 0 ]; then
   exit 1
 fi
 
+listar_usuarios() {
+  # Junta os usuários não-vazios de uma lista separada por ";" com ", ",
+  # ignorando campos vazios (ex: colunas de membros sem preenchimento).
+  local usuario resultado="" brutos
+  IFS=';' read -ra brutos <<< "$1"
+  for usuario in "${brutos[@]}"; do
+    usuario=$(extrair_usuario "$usuario")
+    if [ -n "$usuario" ]; then
+      resultado="${resultado:+$resultado, }$usuario"
+    fi
+  done
+  echo "$resultado"
+}
+
 echo "Serão criados ${#temas[@]} repositórios em $ORG a partir de $TEMPLATE_REPO:"
 echo ""
 for i in "${!temas[@]}"; do
   echo "  ${PREFIXO_REPO}-${slugs[$i]}"
   echo "    tema: ${temas[$i]}"
-  echo "    colaboradores: ${usuarios_por_equipe[$i]//;/, }"
+  echo "    colaboradores: $(listar_usuarios "${usuarios_por_equipe[$i]}")"
 done
 echo ""
 read -r -p "Confirma a criação desses ${#temas[@]} repositórios? [s/N] " resposta

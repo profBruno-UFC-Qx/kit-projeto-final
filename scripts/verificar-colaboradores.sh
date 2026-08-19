@@ -33,6 +33,26 @@ if [ ! -f "$CSV" ]; then
   exit 1
 fi
 
+indice_coluna() {
+  # Índice (0-based) da coluna $1 no cabeçalho do CSV, ou -1 se não achar.
+  local procurado="$1" i=0 nome
+  local -a colunas
+  IFS=',' read -ra colunas < <(head -n 1 "$CSV")
+  for nome in "${colunas[@]}"; do
+    nome=$(printf '%s' "$nome" | xargs | tr '[:upper:]' '[:lower:]')
+    [ "$nome" = "$procurado" ] && { echo "$i"; return; }
+    i=$((i + 1))
+  done
+  echo -1
+}
+
+IDX_TEMA=$(indice_coluna "tema")
+IDX_USUARIOS=$(indice_coluna "usuarios_github")
+if [ "$IDX_TEMA" -lt 0 ] || [ "$IDX_USUARIOS" -lt 0 ]; then
+  echo "O cabeçalho do CSV precisa ter as colunas 'tema' e 'usuarios_github' (outras colunas são ignoradas)."
+  exit 1
+fi
+
 slugificar() {
   printf '%s' "$1" \
     | sed -E \
@@ -55,7 +75,10 @@ extrair_usuario() {
 total_pendentes=0
 total_nao_encontrados=0
 
-while IFS=',' read -r tema usuarios; do
+while IFS=',' read -r -a campos; do
+  [ "${#campos[@]}" -eq 0 ] && continue
+  tema="${campos[$IDX_TEMA]:-}"
+  usuarios="${campos[$IDX_USUARIOS]:-}"
   [ -z "$tema" ] && continue
   slug=$(slugificar "$tema")
   repo="$ORG/${PREFIXO_REPO}-${slug}"

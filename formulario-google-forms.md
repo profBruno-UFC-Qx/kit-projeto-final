@@ -34,19 +34,31 @@ coluna por campo de cada membro). Os scripts do kit esperam um CSV
 simples de 2 colunas: `tema,usuarios_github` (usuários separados por `;`).
 
 Numa coluna auxiliar da planilha de respostas, monte a lista de links com
-uma fórmula que ignora células vazias, por exemplo (ajuste as letras de
-coluna para onde ficaram os campos "Link do perfil do GitHub"):
+uma fórmula, por exemplo (ajuste as letras de coluna para onde ficaram os
+campos "Link do perfil do GitHub"):
 
 ```
 =TEXTJOIN(";", TRUE, K2, N2, Q2, T2, W2, Z2, AC2, AF2, AI2, AL2)
 ```
 
-Depois copie `Tema` + essa coluna auxiliar para um novo arquivo e salve
-como CSV com o cabeçalho `tema,usuarios_github`. Não precisa extrair o
-usuário do link antes de colar — os scripts do kit aceitam
-`github.com/usuario` direto no CSV. Para 15-20 equipes por
-disciplina/semestre, copiar/colar manualmente é mais simples do que
-automatizar essa etapa.
+Se sua planilha não tiver `TEXTJOIN` (ou o parâmetro de ignorar vazios
+não funcionar direito), não tem problema usar uma concatenação simples
+que deixa `;` vazios entre os membros que não preencheram, por exemplo:
+
+```
+=K2&";"&N2&";"&Q2&";"&T2&";"&W2&";"&Z2&";"&AC2&";"&AF2&";"&AI2&";"&AL2
+```
+
+Os scripts do kit ignoram campos vazios entre `;` automaticamente.
+
+Depois copie as colunas necessárias para um novo arquivo/aba e salve como
+CSV com um cabeçalho contendo pelo menos `tema` e `usuarios_github` (em
+qualquer posição). Colunas extras — como uma coluna `disciplina` que sua
+planilha já traga por padrão — são ignoradas, não precisa removê-las
+manualmente. Não precisa extrair o usuário do link antes de colar — os
+scripts do kit aceitam `github.com/usuario` ou o link completo direto no
+CSV. Para 15-20 equipes por disciplina/semestre, copiar/colar manualmente
+é mais simples do que automatizar essa etapa.
 
 ## Respostas atrasadas
 

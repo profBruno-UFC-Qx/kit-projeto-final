@@ -37,6 +37,25 @@ if [ ! -f "$CSV" ]; then
   exit 1
 fi
 
+indice_coluna() {
+  # Índice (0-based) da coluna $1 no cabeçalho do CSV, ou -1 se não achar.
+  local procurado="$1" i=0 nome
+  local -a colunas
+  IFS=',' read -ra colunas < <(head -n 1 "$CSV")
+  for nome in "${colunas[@]}"; do
+    nome=$(printf '%s' "$nome" | xargs | tr '[:upper:]' '[:lower:]')
+    [ "$nome" = "$procurado" ] && { echo "$i"; return; }
+    i=$((i + 1))
+  done
+  echo -1
+}
+
+IDX_TEMA=$(indice_coluna "tema")
+if [ "$IDX_TEMA" -lt 0 ]; then
+  echo "O cabeçalho do CSV precisa ter a coluna 'tema' (outras colunas são ignoradas)."
+  exit 1
+fi
+
 slugificar() {
   printf '%s' "$1" \
     | sed -E \
@@ -58,7 +77,9 @@ case "$resposta" in
   *) echo "Cancelado."; exit 0 ;;
 esac
 
-while IFS=',' read -r tema _usuarios; do
+while IFS=',' read -r -a campos; do
+  [ "${#campos[@]}" -eq 0 ] && continue
+  tema="${campos[$IDX_TEMA]:-}"
   [ -z "$tema" ] && continue
   slug=$(slugificar "$tema")
   repo="$ORG/${PREFIXO_REPO}-${slug}"
