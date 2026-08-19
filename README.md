@@ -21,6 +21,9 @@ por cada disciplina, no próprio template dela.
   de teste, uso de IA, dificuldades encontradas)
 - `templates/PROPOSTA.md` e `templates/ENTREGA.md` — conteúdo canônico a
   copiar para o template de cada disciplina
+- `templates/SECAO-WEBSITE.md` — seção pronta (formato Jekyll/Just the
+  Docs) explicando o fluxo aos alunos, para colar na página "Projeto
+  Final" do site de cada disciplina
 - `scripts/criar-repos.sh` — cria os repositórios das equipes a partir
   do template da disciplina, adiciona colaboradores, protege a `main`
   (aprovação do professor + check de proposta obrigatórios)
