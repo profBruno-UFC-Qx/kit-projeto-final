@@ -1,0 +1,37 @@
+name: Testes (kit)
+
+# Workflow reutilizável. Chamado pelos templates de atividade via:
+#   jobs:
+#     testes:
+#       uses: profBruno-UFC-Qx/kit-projeto-final/.github/workflows/testes.yml@main
+#
+# Roda a suíte de testes JUnit via Gradle Wrapper. Independente do
+# autograding do GitHub Classroom (que só dispara se o repositório
+# estiver vinculado a uma assignment ativa) — isso roda em todo push,
+# dando feedback imediato ao aluno.
+
+on:
+  workflow_call:
+
+jobs:
+  testes:
+    name: testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+      - name: Dar permissão de execução ao gradlew
+        run: chmod +x ./gradlew
+      - name: Rodar testes
+        run: ./gradlew test
+      - name: Publicar relatório de testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-testes
+          path: build/reports/tests/test
+          retention-days: 7

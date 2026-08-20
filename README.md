@@ -1,10 +1,23 @@
 # kit-projeto-final
 
-Ferramentas compartilhadas para o fluxo de projeto final de disciplinas
-que usam equipes + repositório-template por equipe no GitHub:
-proposta escrita → aprovação → desenvolvimento → entrega final validada
-→ coleta em lote. Substitui o que o GitHub Classroom fazia antes de ser
-descontinuado.
+Ferramentas compartilhadas para dois fluxos de disciplina que usam
+repositório-template no GitHub (nome do repositório ainda reflete só o
+primeiro; deve ser renomeado):
+
+- **Projeto final** (este README): equipes + repositório-template por
+  equipe, proposta escrita → aprovação → desenvolvimento → entrega final
+  validada → coleta em lote. Substitui o que o GitHub Classroom fazia
+  antes de ser descontinuado.
+- **[Atividades práticas](atividades-praticas/README.md)**: repositório
+  individual por aluno por atividade, sem etapa de proposta, com
+  `RELATO.md` substituindo formulário e branch protegida desde a
+  criação.
+
+Os workflows reutilizáveis dos dois fluxos ficam juntos em
+`.github/workflows/` (obrigatório pelo GitHub — não dá pra colocar
+workflow reutilizável em subpasta), mas templates/scripts/config de cada
+fluxo ficam separados: os do projeto final na raiz (como sempre foram),
+os das atividades práticas em `atividades-praticas/`.
 
 Este repositório cobre só o **processo** (criação de repositórios,
 formato padrão de proposta/entrega, validação, aprovação, coleta). A

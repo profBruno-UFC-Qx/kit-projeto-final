@@ -1,0 +1,76 @@
+name: Validar Relato (kit)
+
+# Workflow reutilizável. Chamado pelos templates de atividade via:
+#   jobs:
+#     validar-relato:
+#       uses: profBruno-UFC-Qx/kit-projeto-final/.github/workflows/validar-relato.yml@main
+#
+# Só valida as seções GENÉRICAS de RELATO.md (antes do marcador
+# "<!-- kit:fim-secoes-genericas -->"). O que vem depois do marcador é
+# específico de cada atividade e não é verificado aqui.
+
+on:
+  workflow_call:
+
+jobs:
+  validar-relato:
+    name: validar-relato
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validar RELATO.md
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          RELATO="RELATO.md"
+          MARCADOR="<!-- kit:fim-secoes-genericas -->"
+
+          if [ ! -f "$RELATO" ]; then
+            echo "❌ Não encontrei $RELATO na raiz do repositório."
+            exit 1
+          fi
+
+          GENERICO=$(awk -v marcador="$MARCADOR" 'index($0, marcador) { exit } { print }' "$RELATO")
+
+          falhou=0
+
+          placeholder() {
+            if printf '%s' "$GENERICO" | grep -qF "$1"; then
+              echo "❌ Campo ainda não preenchido: \"$1\""
+              falhou=1
+            fi
+          }
+
+          secao_obrigatoria() {
+            if ! printf '%s' "$GENERICO" | grep -qF "$1"; then
+              echo "❌ Seção obrigatória removida ou renomeada: \"$1\""
+              falhou=1
+            fi
+          }
+
+          placeholder "_Seu nome completo._"
+          placeholder "_Seu número de matrícula._"
+          placeholder "_Ex: \"Sozinho\", \"Sozinho, mas discuti dúvidas com Fulano\"._"
+          placeholder "_Quais foram as principais dificuldades? O que você aprendeu com essa atividade?_"
+          placeholder "_1 = Muito fácil, 5 = Muito difícil._"
+          placeholder "_1 = Muito chato, 5 = Muito interessante._"
+          placeholder "_Tempo total, incluindo revisão de material, vídeos e programação (em horas)._"
+          placeholder "Você usou alguma ferramenta de IA (ex: ChatGPT, Claude, GitHub Copilot) para resolver essa"
+
+          secao_obrigatoria "## Nome"
+          secao_obrigatoria "## Matrícula"
+          secao_obrigatoria "## Com quem você fez essa atividade?"
+          secao_obrigatoria "## Dificuldades encontradas e aprendizado"
+          secao_obrigatoria "## Grau de dificuldade (1 a 5)"
+          secao_obrigatoria "## O quão interessante foi o problema proposto (1 a 5)"
+          secao_obrigatoria "## Tempo gasto"
+          secao_obrigatoria "Uso de ferramentas de Inteligência Artificial"
+
+          if [ "$falhou" -ne 0 ]; then
+            echo ""
+            echo "O relato ainda não está completo. Preencha os itens acima e faça commit."
+            exit 1
+          fi
+
+          echo "✅ Relato passou na validação mínima."
