@@ -4,13 +4,29 @@ name: Validar Relato (kit)
 #   jobs:
 #     validar-relato:
 #       uses: profBruno-UFC-Qx/kit-projeto-final/.github/workflows/validar-relato.yml@main
+#       with:
+#         project_number: 7
+#       secrets: inherit
 #
 # Só valida as seções GENÉRICAS de RELATO.md (antes do marcador
 # "<!-- kit:fim-secoes-genericas -->"). O que vem depois do marcador é
 # específico de cada atividade e não é verificado aqui.
+#
+# Precisa ser chamado com "on: pull_request" no template (não "push") —
+# o job adicionar-ao-board só tem contexto de PR (github.event.pull_request)
+# nesse tipo de evento.
 
 on:
   workflow_call:
+    inputs:
+      project_number:
+        description: "Número do GitHub Project (v2) onde a entrega deve aparecer quando o relato for validado. Omitido = não adiciona a nenhum board."
+        required: false
+        type: number
+    secrets:
+      ADD_TO_PROJECT_PAT:
+        description: "PAT com escopo 'project' (write), usado só pelo job adicionar-ao-board."
+        required: false
 
 jobs:
   validar-relato:
@@ -74,3 +90,22 @@ jobs:
           fi
 
           echo "✅ Relato passou na validação mínima."
+
+  adicionar-ao-board:
+    name: adicionar-ao-board
+    needs: validar-relato
+    if: inputs.project_number != null && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Adicionar PR ao Project
+        env:
+          GH_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+        run: |
+          set -uo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "⚠️  Secret ADD_TO_PROJECT_PAT não disponível para este repositório — pulando."
+            exit 0
+          fi
+          gh project item-add "${{ inputs.project_number }}" \
+            --owner profBruno-UFC-Qx \
+            --url "${{ github.event.pull_request.html_url }}"

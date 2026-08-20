@@ -44,24 +44,47 @@ reutilizável ali, não dentro desta subpasta.
    ```yaml
    name: Validar Relato
    on:
-     push:
+     pull_request:
+       types: [opened, synchronize, reopened]
    jobs:
      validar-relato:
        uses: profBruno-UFC-Qx/kit-projeto-final/.github/workflows/validar-relato.yml@main
+       with:
+         project_number: 7  # board "Propostas Projeto Final — QXD0007" (compartilhado)
+       secrets: inherit
    ```
+   `project_number` é opcional — omita se não quiser que a atividade
+   apareça em nenhum GitHub Project. `secrets: inherit` repassa o
+   `ADD_TO_PROJECT_PAT` (secret já cadastrado na org) pro workflow
+   reutilizável; sem ele, o job `adicionar-ao-board` só avisa e sai, sem
+   quebrar a validação do relato.
 3. Adicione `.github/workflows/testes.yml` no template:
    ```yaml
    name: Testes
    on:
-     push:
+     pull_request:
+       types: [opened, synchronize, reopened]
    jobs:
      testes:
        uses: profBruno-UFC-Qx/kit-projeto-final/.github/workflows/testes.yml@main
    ```
+   O gatilho é `pull_request`, não `push` — é o mesmo padrão que o fluxo
+   de projeto final já usa, e é o que dá ao job `adicionar-ao-board` (em
+   `validar-relato.yml`) acesso à URL do PR.
 4. Confirme que o repositório continua marcado como **template**
    (Settings → Template repository).
 5. Crie `config/ppNN.env` aqui, copiando um dos existentes e ajustando
    `TEMPLATE_REPO` e `PREFIXO_REPO`.
+
+## Board do GitHub Project
+
+Quando o check `Validar Relato` passa numa Pull Request, ela é adicionada
+automaticamente ao GitHub Project #7 (hoje chamado "Propostas Projeto
+Final — QXD0007", reaproveitado dos dois fluxos — meio ambíguo, deve ser
+renomeado). Repositórios de atividade aparecem lá com nome
+`ppNN-usuario`, distinguíveis dos repositórios de projeto final pelo
+nome. Requer o secret de organização `ADD_TO_PROJECT_PAT` (PAT com escopo
+`project`, já cadastrado).
 
 ## Fluxo por atividade (com roster de alunos)
 
