@@ -23,7 +23,9 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '11'
+          # Gradle 9 (usado pelo wrapper das atividades) exige JDK 17+ para
+          # rodar. Usamos 21 para bater com a toolchain declarada nos projetos.
+          java-version: '21'
       - name: Dar permissão de execução ao gradlew
         run: chmod +x ./gradlew
       - name: Rodar testes
