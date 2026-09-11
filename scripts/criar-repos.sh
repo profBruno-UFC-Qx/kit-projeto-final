@@ -226,8 +226,23 @@ for i in "${!temas[@]}"; do
       || echo "  ⚠️  não consegui adicionar $usuario_limpo (verifique o usuário)"
   done
 
+  # Repo criado a partir de template é gerado de forma assíncrona: a
+  # criação retorna antes do branch main (com o conteúdo do template)
+  # existir de fato, o que causa "Branch not found" se a proteção for
+  # aplicada cedo demais. Espera o branch aparecer antes de continuar.
+  tentativas=0
+  until gh api "repos/$repo/branches/main" >/dev/null 2>&1; do
+    tentativas=$((tentativas + 1))
+    if [ "$tentativas" -ge 15 ]; then
+      echo "  ⚠️  branch main de $repo não apareceu após $((tentativas * 2))s; tentando proteger mesmo assim."
+      break
+    fi
+    sleep 2
+  done
+
   echo "  aplicando proteção de branch em main (check obrigatório: $CHECK_PROPOSTA)"
-  gh api "repos/$repo/branches/main/protection" -X PUT --input - <<EOF
+  gh api "repos/$repo/branches/main/protection" -X PUT --input - <<EOF \
+    || echo "  ⚠️  não consegui proteger a branch main de $repo (rode o script de novo para tentar de novo)"
 {
   "required_status_checks": {
     "strict": true,
