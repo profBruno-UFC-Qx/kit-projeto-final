@@ -25,7 +25,10 @@
 #   "usuario" ou como link do perfil ("github.com/usuario" ou
 #   "https://github.com/usuario") — os dois formatos são aceitos. Campos
 #   vazios entre ";" (ex: equipe menor que o número de colunas do
-#   formulário) são ignorados.
+#   formulário) são ignorados. O parsing do CSV é tolerante a quebras de
+#   linha CRLF e a campos entre aspas contendo vírgula (comum quando um
+#   "tema" de texto livre tem vírgula e o Google Forms/Sheets aspeia o
+#   campo no export).
 #
 # Reexecutável: se um repositório do CSV já existir, ele é pulado (sem
 # recriar nem duplicar colaboradores/proteção). Isso permite adicionar
@@ -59,11 +62,38 @@ if [ ! -f "$CSV" ]; then
   exit 1
 fi
 
+csv_para_campos() {
+  # Converte cada linha da entrada padrão (CSV no formato RFC 4180) em
+  # campos separados por \x1f, respeitando vírgulas e aspas dentro de
+  # campos entre aspas (comum em exports do Google Forms/Sheets quando um
+  # campo de texto livre, ex: "tema", contém vírgula).
+  awk '
+    BEGIN { FS = "" }
+    {
+      campo = ""; dentro = 0; out = "";
+      for (i = 1; i <= length($0); i++) {
+        c = substr($0, i, 1)
+        if (dentro) {
+          if (c == "\"") {
+            if (substr($0, i + 1, 1) == "\"") { campo = campo "\""; i++ }
+            else dentro = 0
+          } else campo = campo c
+        } else {
+          if (c == "\"") dentro = 1
+          else if (c == ",") { out = out campo "\x1f"; campo = "" }
+          else campo = campo c
+        }
+      }
+      print out campo
+    }
+  '
+}
+
 indice_coluna() {
   # Índice (0-based) da coluna $1 no cabeçalho do CSV, ou -1 se não achar.
   local procurado="$1" i=0 nome
   local -a colunas
-  IFS=',' read -ra colunas < <(head -n 1 "$CSV")
+  IFS=$'\x1f' read -ra colunas < <(head -n 1 "$CSV" | tr -d '\r' | csv_para_campos)
   for nome in "${colunas[@]}"; do
     nome=$(printf '%s' "$nome" | xargs | tr '[:upper:]' '[:lower:]')
     [ "$nome" = "$procurado" ] && { echo "$i"; return; }
@@ -107,7 +137,7 @@ temas=()
 slugs=()
 usuarios_por_equipe=()
 
-while IFS=',' read -r -a campos; do
+while IFS=$'\x1f' read -r -a campos; do
   [ "${#campos[@]}" -eq 0 ] && continue
   tema="${campos[$IDX_TEMA]:-}"
   usuarios="${campos[$IDX_USUARIOS]:-}"
@@ -116,7 +146,7 @@ while IFS=',' read -r -a campos; do
   temas+=("$tema")
   slugs+=("$slug")
   usuarios_por_equipe+=("$usuarios")
-done < <(tail -n +2 "$CSV")
+done < <(tail -n +2 "$CSV" | tr -d '\r' | csv_para_campos)
 
 if [ "${#temas[@]}" -eq 0 ]; then
   echo "Nenhuma equipe encontrada em $CSV."
