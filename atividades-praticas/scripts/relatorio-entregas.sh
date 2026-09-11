@@ -8,6 +8,11 @@
 
 set -uo pipefail
 
+# Evita que o gh mande respostas para um pager interativo (less, via
+# $PAGER/$GH_PAGER do usuário), o que pausaria o script em cada
+# repositório do loop esperando 'q'.
+export GH_PAGER=cat
+
 if [ "${1:-}" != "--config" ] || [ -z "${2:-}" ]; then
   echo "Uso: $0 --config config/ppNN.env roster.csv [--csv saida.csv]"
   exit 1
@@ -35,10 +40,37 @@ if [ ! -f "$CSV" ]; then
   exit 1
 fi
 
+csv_para_campos() {
+  # Converte cada linha da entrada padrão (CSV no formato RFC 4180) em
+  # campos separados por \x1f, respeitando vírgulas e aspas dentro de
+  # campos entre aspas (comum em exports do Google Forms/Sheets quando um
+  # campo de texto livre, ex: "nome", contém vírgula).
+  awk '
+    BEGIN { FS = "" }
+    {
+      campo = ""; dentro = 0; out = "";
+      for (i = 1; i <= length($0); i++) {
+        c = substr($0, i, 1)
+        if (dentro) {
+          if (c == "\"") {
+            if (substr($0, i + 1, 1) == "\"") { campo = campo "\""; i++ }
+            else dentro = 0
+          } else campo = campo c
+        } else {
+          if (c == "\"") dentro = 1
+          else if (c == ",") { out = out campo "\x1f"; campo = "" }
+          else campo = campo c
+        }
+      }
+      print out campo
+    }
+  '
+}
+
 indice_coluna() {
   local procurado="$1" i=0 nome
   local -a colunas
-  IFS=',' read -ra colunas < <(head -n 1 "$CSV")
+  IFS=$'\x1f' read -ra colunas < <(head -n 1 "$CSV" | tr -d '\r' | csv_para_campos)
   for nome in "${colunas[@]}"; do
     nome=$(printf '%s' "$nome" | xargs | tr '[:upper:]' '[:lower:]')
     [ "$nome" = "$procurado" ] && { echo "$i"; return; }
@@ -84,7 +116,7 @@ fi
 
 printf "%-14s %-25s %-8s %-8s %s\n" "USUARIO" "NOME" "RELATO" "TESTES" "REPO"
 
-while IFS=',' read -r -a campos; do
+while IFS=$'\x1f' read -r -a campos; do
   [ "${#campos[@]}" -eq 0 ] && continue
   usuario=$(extrair_usuario "${campos[$IDX_USUARIO]:-}")
   [ -z "$usuario" ] && continue
@@ -105,6 +137,6 @@ while IFS=',' read -r -a campos; do
 
   printf "%-14s %-25s %-8s %-8s %s\n" "$usuario" "$nome" "$(simbolo "$relato")" "$(simbolo "$testes")" "$repo"
   [ -n "$SAIDA_CSV" ] && echo "$matricula,$nome,$usuario,$repo,sim,$relato,$testes" >> "$SAIDA_CSV"
-done < <(tail -n +2 "$CSV")
+done < <(tail -n +2 "$CSV" | tr -d '\r' | csv_para_campos)
 
 [ -n "$SAIDA_CSV" ] && echo "" && echo "Relatório salvo em $SAIDA_CSV"

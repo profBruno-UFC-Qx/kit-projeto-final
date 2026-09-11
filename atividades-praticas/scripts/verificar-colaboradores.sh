@@ -9,6 +9,11 @@
 
 set -uo pipefail
 
+# Evita que o gh mande respostas para um pager interativo (less, via
+# $PAGER/$GH_PAGER do usuário), o que pausaria o script em cada
+# repositório do loop esperando 'q'.
+export GH_PAGER=cat
+
 if [ "${1:-}" != "--config" ] || [ -z "${2:-}" ]; then
   echo "Uso: $0 --config config/ppNN.env roster.csv"
   exit 1
@@ -32,10 +37,37 @@ if [ ! -f "$CSV" ]; then
   exit 1
 fi
 
+csv_para_campos() {
+  # Converte cada linha da entrada padrão (CSV no formato RFC 4180) em
+  # campos separados por \x1f, respeitando vírgulas e aspas dentro de
+  # campos entre aspas (comum em exports do Google Forms/Sheets quando um
+  # campo de texto livre, ex: "nome", contém vírgula).
+  awk '
+    BEGIN { FS = "" }
+    {
+      campo = ""; dentro = 0; out = "";
+      for (i = 1; i <= length($0); i++) {
+        c = substr($0, i, 1)
+        if (dentro) {
+          if (c == "\"") {
+            if (substr($0, i + 1, 1) == "\"") { campo = campo "\""; i++ }
+            else dentro = 0
+          } else campo = campo c
+        } else {
+          if (c == "\"") dentro = 1
+          else if (c == ",") { out = out campo "\x1f"; campo = "" }
+          else campo = campo c
+        }
+      }
+      print out campo
+    }
+  '
+}
+
 indice_coluna() {
   local procurado="$1" i=0 nome
   local -a colunas
-  IFS=',' read -ra colunas < <(head -n 1 "$CSV")
+  IFS=$'\x1f' read -ra colunas < <(head -n 1 "$CSV" | tr -d '\r' | csv_para_campos)
   for nome in "${colunas[@]}"; do
     nome=$(printf '%s' "$nome" | xargs | tr '[:upper:]' '[:lower:]')
     [ "$nome" = "$procurado" ] && { echo "$i"; return; }
@@ -59,7 +91,7 @@ extrair_usuario() {
 total_pendentes=0
 total_nao_encontrados=0
 
-while IFS=',' read -r -a campos; do
+while IFS=$'\x1f' read -r -a campos; do
   [ "${#campos[@]}" -eq 0 ] && continue
   usuario=$(extrair_usuario "${campos[$IDX_USUARIO]:-}")
   [ -z "$usuario" ] && continue
@@ -79,7 +111,7 @@ while IFS=',' read -r -a campos; do
     echo "❌ $repo — $usuario não encontrado (repo não existe ou usuário não foi adicionado; rode criar-repos.sh de novo)"
     total_nao_encontrados=$((total_nao_encontrados + 1))
   fi
-done < <(tail -n +2 "$CSV")
+done < <(tail -n +2 "$CSV" | tr -d '\r' | csv_para_campos)
 
 echo ""
 echo "Resumo: $total_pendentes convite(s) pendente(s), $total_nao_encontrados problema(s)."

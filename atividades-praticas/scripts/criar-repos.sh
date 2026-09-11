@@ -26,7 +26,10 @@
 #   qualquer posição/ordem). Outras colunas (ex: "matricula", "nome") são
 #   ignoradas por este script, mas úteis para você e para
 #   verificar-colaboradores.sh. Aceita tanto "usuario" quanto
-#   "github.com/usuario" ou "https://github.com/usuario".
+#   "github.com/usuario" ou "https://github.com/usuario". O parsing do
+#   CSV é tolerante a quebras de linha CRLF e a campos entre aspas
+#   contendo vírgula (comum quando um campo de texto livre, ex: "nome",
+#   tem vírgula e o Google Forms/Sheets aspeia o campo no export).
 #
 # Reexecutável: se um repositório do CSV já existir, ele é pulado (sem
 # recriar nem duplicar colaborador/proteção). Isso permite adicionar um
@@ -34,6 +37,11 @@
 # alunos + o novo), sem precisar de um caminho separado.
 
 set -uo pipefail
+
+# Evita que o gh mande respostas para um pager interativo (less, via
+# $PAGER/$GH_PAGER do usuário), o que pausaria o script em cada
+# repositório do loop esperando 'q'.
+export GH_PAGER=cat
 
 if [ "${1:-}" != "--config" ] || [ -z "${2:-}" ]; then
   echo "Uso: $0 --config config/ppNN.env roster.csv"
@@ -61,11 +69,38 @@ if [ ! -f "$CSV" ]; then
   exit 1
 fi
 
+csv_para_campos() {
+  # Converte cada linha da entrada padrão (CSV no formato RFC 4180) em
+  # campos separados por \x1f, respeitando vírgulas e aspas dentro de
+  # campos entre aspas (comum em exports do Google Forms/Sheets quando um
+  # campo de texto livre, ex: "nome", contém vírgula).
+  awk '
+    BEGIN { FS = "" }
+    {
+      campo = ""; dentro = 0; out = "";
+      for (i = 1; i <= length($0); i++) {
+        c = substr($0, i, 1)
+        if (dentro) {
+          if (c == "\"") {
+            if (substr($0, i + 1, 1) == "\"") { campo = campo "\""; i++ }
+            else dentro = 0
+          } else campo = campo c
+        } else {
+          if (c == "\"") dentro = 1
+          else if (c == ",") { out = out campo "\x1f"; campo = "" }
+          else campo = campo c
+        }
+      }
+      print out campo
+    }
+  '
+}
+
 indice_coluna() {
   # Índice (0-based) da coluna $1 no cabeçalho do CSV, ou -1 se não achar.
   local procurado="$1" i=0 nome
   local -a colunas
-  IFS=',' read -ra colunas < <(head -n 1 "$CSV")
+  IFS=$'\x1f' read -ra colunas < <(head -n 1 "$CSV" | tr -d '\r' | csv_para_campos)
   for nome in "${colunas[@]}"; do
     nome=$(printf '%s' "$nome" | xargs | tr '[:upper:]' '[:lower:]')
     [ "$nome" = "$procurado" ] && { echo "$i"; return; }
@@ -89,12 +124,12 @@ extrair_usuario() {
 }
 
 usuarios=()
-while IFS=',' read -r -a campos; do
+while IFS=$'\x1f' read -r -a campos; do
   [ "${#campos[@]}" -eq 0 ] && continue
   usuario=$(extrair_usuario "${campos[$IDX_USUARIO]:-}")
   [ -z "$usuario" ] && continue
   usuarios+=("$usuario")
-done < <(tail -n +2 "$CSV")
+done < <(tail -n +2 "$CSV" | tr -d '\r' | csv_para_campos)
 
 if [ "${#usuarios[@]}" -eq 0 ]; then
   echo "Nenhum aluno encontrado em $CSV."
@@ -144,8 +179,23 @@ for usuario in "${usuarios[@]}"; do
     continue
   fi
 
+  # Repo criado a partir de template é gerado de forma assíncrona: a
+  # criação retorna antes do branch (com o conteúdo do template) existir
+  # de fato, o que causa "Branch not found" se a proteção for aplicada
+  # cedo demais. Espera o branch aparecer antes de continuar.
+  tentativas=0
+  until gh api "repos/$repo/branches/$default_branch" >/dev/null 2>&1; do
+    tentativas=$((tentativas + 1))
+    if [ "$tentativas" -ge 15 ]; then
+      echo "  ⚠️  branch $default_branch de $repo não apareceu após $((tentativas * 2))s; tentando proteger mesmo assim."
+      break
+    fi
+    sleep 2
+  done
+
   echo "  aplicando proteção de branch em $default_branch (check obrigatório: $CHECK_RELATO)"
-  gh api "repos/$repo/branches/$default_branch/protection" -X PUT --input - <<EOF
+  gh api "repos/$repo/branches/$default_branch/protection" -X PUT --input - <<EOF \
+    || echo "  ⚠️  não consegui proteger a branch $default_branch de $repo (rode o script de novo para tentar de novo)"
 {
   "required_status_checks": {
     "strict": true,
