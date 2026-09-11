@@ -6,6 +6,11 @@
 
 set -uo pipefail
 
+# Evita que o gh mande respostas para um pager interativo (less, via
+# $PAGER/$GH_PAGER do usuário), o que pausaria o script em cada
+# repositório do loop esperando 'q'.
+export GH_PAGER=cat
+
 if [ "${1:-}" != "--config" ] || [ -z "${2:-}" ]; then
   echo "Uso: $0 --config disciplina.env equipes.csv [pasta-destino]"
   exit 1
