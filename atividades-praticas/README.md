@@ -36,6 +36,9 @@ reutilizável ali, não dentro desta subpasta.
 - `scripts/reenviar-convites.sh` — reenvia o convite de quem não tem
   acesso: remove convites expirados (o GitHub expira em 7 dias) e cria
   novos, e convida quem nunca foi adicionado
+- `scripts/travar-entregas.sh` — depois do prazo, rebaixa cada aluno de
+  colaborador (push) para leitura (pull): impede novos push/PR sem
+  tirar o acesso de leitura ao próprio código
 - `scripts/relatorio-entregas.sh` — visibilidade de quem entregou: para
   cada aluno do roster, mostra se o repositório existe e o resultado mais
   recente dos checks `Validar Relato` e `Testes`
@@ -108,6 +111,16 @@ Convite expirado (aluno não aceitou em 7 dias): rode
 Ele lista quem está com convite expirado ou sem convite, pede
 confirmação, e ao final imprime o link de aceite de cada aluno para você
 repassar. Convites ainda válidos e colaboradores ativos são ignorados.
+
+Prazo encerrado: rode
+`./scripts/travar-entregas.sh --config config/pp01.env GestaoQXD0007/roster.csv`
+para rebaixar cada aluno de colaborador (push) para leitura (pull). O
+aluno continua vendo o próprio repositório e PRs abertos, mas não
+consegue mais dar push nem abrir/atualizar PR — sem apagar nada. Pula
+quem já está como leitura, quem não é colaborador e quem tem permissão
+acima de push (admin/maintain, ajuste manual). Para reabrir o prazo de
+um aluno específico, rode `criar-repos.sh` de novo com o CSV (ele
+readiciona com push quem já é colaborador).
 
 Resposta atrasada do roster: adicione o aluno ao CSV completo (todos os
 alunos + o novo) e rode `criar-repos.sh` de novo — repositórios já
