@@ -33,6 +33,9 @@ reutilizável ali, não dentro desta subpasta.
   humana)
 - `scripts/verificar-colaboradores.sh` — relata usuários com convite
   pendente (não aceito) ou não encontrados (typo/inexistente)
+- `scripts/reenviar-convites.sh` — reenvia o convite de quem não tem
+  acesso: remove convites expirados (o GitHub expira em 7 dias) e cria
+  novos, e convida quem nunca foi adicionado
 - `scripts/relatorio-entregas.sh` — visibilidade de quem entregou: para
   cada aluno do roster, mostra se o repositório existe e o resultado mais
   recente dos checks `Validar Relato` e `Testes`
@@ -99,6 +102,12 @@ semestre e reaproveitado nas seis atividades — só muda o
 #     "Validar Relato" ficar verde (não precisa da sua aprovação) ...
 ./scripts/relatorio-entregas.sh --config config/pp01.env GestaoQXD0007/roster.csv --csv entregas-pp01.csv
 ```
+
+Convite expirado (aluno não aceitou em 7 dias): rode
+`./scripts/reenviar-convites.sh --config config/pp01.env GestaoQXD0007/roster.csv`.
+Ele lista quem está com convite expirado ou sem convite, pede
+confirmação, e ao final imprime o link de aceite de cada aluno para você
+repassar. Convites ainda válidos e colaboradores ativos são ignorados.
 
 Resposta atrasada do roster: adicione o aluno ao CSV completo (todos os
 alunos + o novo) e rode `criar-repos.sh` de novo — repositórios já
