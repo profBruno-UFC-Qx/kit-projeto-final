@@ -55,6 +55,10 @@ por cada disciplina, no próprio template dela.
 - `config-exemplo.env` — modelo do arquivo de configuração por disciplina
 - `NOVA-DISCIPLINA.md` — explicação do fluxo completo + passo a passo
   para conectar uma disciplina nova ao kit
+- `EXTENSAO.md` — opcional: critérios do MEC/CNE para extensão
+  universitária, e como avaliar/comprovar isso no fluxo de projeto final
+  (skill `avaliar-propostas`, carta + declaração de interação com
+  stakeholder)
 
 ## Adicionando uma disciplina nova
 
