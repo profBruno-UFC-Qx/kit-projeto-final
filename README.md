@@ -47,8 +47,9 @@ por cada disciplina, no próprio template dela.
   passa a exigir também o check de entrega para mesclar na `main`
 - `scripts/clonar-tudo.sh` — clona/atualiza em lote no fim do semestre
 - `scripts/coletar-propostas.sh` — busca o `PROPOSTA.md` de cada equipe
-  (da PR de proposta aberta, ou da branch padrão se já mesclada), usado
-  pela skill `avaliar-propostas`
+  e classifica cada uma (pendente de aprovação, já aprovada — via PR ou
+  mesclada —, ou ausente), usado pela skill `avaliar-propostas` para não
+  reavaliar proposta já decidida
 - `formulario-google-forms.md` — especificação dos campos do formulário
   de coleta de equipes
 - `config-exemplo.env` — modelo do arquivo de configuração por disciplina

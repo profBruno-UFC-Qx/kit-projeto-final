@@ -1,10 +1,22 @@
 #!/usr/bin/env bash
 # Busca o PROPOSTA.md de cada equipe do CSV, do jeito que ele está agora
-# para revisão: se a equipe tem uma Pull Request de proposta aberta, lê o
-# conteúdo dessa PR (branch da proposta, ainda não mesclada — normal no
-# fluxo de projeto final, que exige aprovação do professor via
-# CODEOWNERS antes de mesclar); senão, cai para o conteúdo da branch
-# padrão (proposta já aprovada/mesclada, ou você está reconferindo depois).
+# para revisão, e classifica cada uma em "fonte" para que quem for
+# avaliar (ex: a skill avaliar-propostas) saiba o que já foi decidido e
+# não precisa reavaliar:
+#
+#   pendente          — PR de proposta aberta, ainda sem aprovação do
+#                        code owner (professor). É o caso que precisa de
+#                        avaliação.
+#   aprovada-pr        — PR de proposta aberta, já aprovada pelo code
+#                        owner (branch protection exige 1 aprovação de
+#                        code owner para mesclar — reviewDecision da API
+#                        do GitHub). Decisão já tomada, só falta mesclar.
+#   aprovada-mesclada  — sem PR aberta, mas há PROPOSTA.md na branch
+#                        padrão: só chega lá depois de aprovada (mesma
+#                        exigência de branch protection). Decisão já
+#                        tomada.
+#   ausente            — sem PR aberta e sem PROPOSTA.md na branch
+#                        padrão: equipe ainda não enviou proposta.
 #
 # Só lê pela API — não clona nada. Proposta é texto (não há código pra
 # cruzar nesse estágio do fluxo), então não há necessidade de clone raso
@@ -13,8 +25,8 @@
 # Uso: ./coletar-propostas.sh --config disciplina.env equipes.csv [pasta-destino]
 #
 # Saída em pasta-destino/:
-#   <slug-do-tema>.md   — conteúdo do PROPOSTA.md
-#   _propostas.csv      — tema,slug,repo,pr_url,fonte (pr|branch-padrao|ausente)
+#   <slug-do-tema>.md   — conteúdo do PROPOSTA.md (quando encontrado)
+#   _propostas.csv      — tema,slug,repo,pr_url,fonte
 
 set -uo pipefail
 
@@ -112,8 +124,8 @@ SAIDA_CSV="$DESTINO/_propostas.csv"
 echo "tema,slug,repo,pr_url,fonte" > "$SAIDA_CSV"
 
 total=0
-com_pr_aberta=0
-sem_pr_aberta=0
+pendentes=0
+aprovadas=0
 ausentes=0
 
 while IFS=$'\x1f' read -r -a campos; do
@@ -133,31 +145,41 @@ while IFS=$'\x1f' read -r -a campos; do
   fi
 
   # PR de proposta aberta mais recente (se houver mais de uma, algo
-  # incomum já mereceria uma olhada manual — pega a mais recente).
-  pr_info=$(gh pr list --repo "$repo" --state open --json number,url,headRefName \
-    --jq 'sort_by(.number) | last | "\(.url) \(.headRefName)"' 2>/dev/null)
+  # incomum já mereceria uma olhada manual — pega a mais recente), com o
+  # reviewDecision que a própria API do GitHub calcula a partir da
+  # exigência de branch protection (1 aprovação de code owner).
+  pr_info=$(gh pr list --repo "$repo" --state open --json number,url,headRefName,reviewDecision \
+    --jq 'sort_by(.number) | last | "\(.url)\t\(.headRefName)\t\(.reviewDecision // "")"' 2>/dev/null)
 
   if [ -n "$pr_info" ]; then
-    pr_url="${pr_info% *}"
-    head_ref="${pr_info##* }"
+    IFS=$'\t' read -r pr_url head_ref review_decision <<< "$pr_info"
+
+    if [ "$review_decision" = "APPROVED" ]; then
+      echo "🟢 $tema — PR já aprovada pelo professor, não avaliada ($pr_url)"
+      echo "\"$tema\",$slug,$repo,$pr_url,aprovada-pr" >> "$SAIDA_CSV"
+      aprovadas=$((aprovadas + 1))
+      continue
+    fi
+
     if conteudo=$(gh api "repos/$repo/contents/PROPOSTA.md?ref=$head_ref" \
         -H "Accept: application/vnd.github.raw" 2>/dev/null); then
       printf '%s\n' "$conteudo" > "$arquivo"
-      echo "✅ $tema — PR aberta ($pr_url)"
-      echo "\"$tema\",$slug,$repo,$pr_url,pr" >> "$SAIDA_CSV"
-      com_pr_aberta=$((com_pr_aberta + 1))
+      echo "✅ $tema — PR aberta, pendente de avaliação ($pr_url)"
+      echo "\"$tema\",$slug,$repo,$pr_url,pendente" >> "$SAIDA_CSV"
+      pendentes=$((pendentes + 1))
       continue
     fi
   fi
 
-  # Sem PR aberta (ou sem PROPOSTA.md nela) — tenta a branch padrão
-  # (proposta já mesclada, ou você está reconferindo depois da aprovação).
+  # Sem PR aberta pendente — tenta a branch padrão. Só chega lá depois de
+  # aprovada (mesma exigência de branch protection), então já é decisão
+  # tomada, não precisa reavaliar.
   if conteudo=$(gh api "repos/$repo/contents/PROPOSTA.md" \
       -H "Accept: application/vnd.github.raw" 2>/dev/null); then
     printf '%s\n' "$conteudo" > "$arquivo"
-    echo "⚠️  $tema — sem PR aberta, lendo da branch padrão (já mesclada?)"
-    echo "\"$tema\",$slug,$repo,,branch-padrao" >> "$SAIDA_CSV"
-    sem_pr_aberta=$((sem_pr_aberta + 1))
+    echo "🟢 $tema — já mesclada (aprovada), não avaliada"
+    echo "\"$tema\",$slug,$repo,,aprovada-mesclada" >> "$SAIDA_CSV"
+    aprovadas=$((aprovadas + 1))
   else
     echo "❌ $tema — sem PR aberta e sem PROPOSTA.md na branch padrão (ainda não enviou)"
     echo "\"$tema\",$slug,$repo,,ausente" >> "$SAIDA_CSV"
@@ -166,5 +188,5 @@ while IFS=$'\x1f' read -r -a campos; do
 done < <(tail -n +2 "$CSV" | tr -d '\r' | csv_para_campos)
 
 echo ""
-echo "Concluído: $total equipe(s) — $com_pr_aberta com PR aberta, $sem_pr_aberta via branch padrão, $ausentes sem proposta."
-echo "Conteúdo em $DESTINO/ ($(basename "$SAIDA_CSV") tem o mapeamento tema→PR)."
+echo "Concluído: $total equipe(s) — $pendentes pendente(s) de avaliação, $aprovadas já aprovada(s) (não avaliadas), $ausentes sem proposta."
+echo "Conteúdo em $DESTINO/ ($(basename "$SAIDA_CSV") tem tema, repo, PR e a coluna 'fonte' com a classificação)."

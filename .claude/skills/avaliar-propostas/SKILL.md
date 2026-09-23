@@ -1,6 +1,6 @@
 ---
 name: avaliar-propostas
-description: Lê o PROPOSTA.md de todas as equipes de uma disciplina de projeto final (aberto ou já mesclado) e dá um parecer de apoio sobre se o sistema proposto pode ser caracterizado como extensão universitária, segundo os critérios do MEC/CNE. Use quando o usuário pedir para avaliar/revisar propostas de uma disciplina, checar se um projeto é extensão, ou preparar a aprovação de propostas.
+description: Lê o PROPOSTA.md de cada equipe de uma disciplina de projeto final cuja proposta ainda não foi aprovada, e dá um parecer de apoio sobre se o sistema proposto pode ser caracterizado como extensão universitária, segundo os critérios do MEC/CNE. Propostas já aprovadas (PR aprovada ou já mesclada) são puladas, não reavaliadas. Use quando o usuário pedir para avaliar/revisar propostas de uma disciplina, checar se um projeto é extensão, ou preparar a aprovação de propostas.
 ---
 
 # Avaliar propostas de projeto final (extensão universitária)
@@ -24,18 +24,22 @@ Rode, a partir da raiz do `kit-projeto-final`:
 ./scripts/coletar-propostas.sh --config <disciplina.env> <equipes.csv> propostas-<disciplina>
 ```
 
-Isso busca, por equipe, o `PROPOSTA.md` da Pull Request de proposta
-aberta (o estado normal nesse ponto do fluxo — a proposta só é mesclada
-depois da aprovação do professor via CODEOWNERS) ou, se não houver PR
-aberta, da branch padrão. Só lê pela API, não clona nada. A pasta de
-saída é local e não deve ser versionada.
+Isso busca, por equipe, o `PROPOSTA.md` e classifica cada uma em
+`propostas-<disciplina>/_propostas.csv`, coluna `fonte`:
 
-`propostas-<disciplina>/_propostas.csv` traz, por equipe, o slug, o
-repositório e a URL da PR (se houver) — use para saber onde comentar,
-se o usuário pedir isso no Passo 4.
+- **`pendente`** — PR de proposta aberta, ainda sem aprovação do
+  professor (code owner). **É só isso que o Passo 3 avalia.**
+- **`aprovada-pr`** — PR aberta, mas já aprovada (branch protection exige
+  1 aprovação de code owner pra mesclar — o script lê `reviewDecision`
+  da própria API do GitHub, não é heurística). Decisão já tomada, **não
+  avaliar de novo**.
+- **`aprovada-mesclada`** — sem PR aberta, `PROPOSTA.md` já está na
+  branch padrão: só chega lá depois de aprovada. **Não avaliar.**
+- **`ausente`** — sem PR aberta e sem `PROPOSTA.md` na branch padrão:
+  equipe ainda não enviou. Não é erro, é um estado a reportar.
 
-Equipes sem proposta (nem PR aberta, nem na branch padrão) também
-entram no resumo — não são um erro, apenas um estado a reportar.
+Só lê pela API, não clona nada. A pasta de saída é local e não deve ser
+versionada.
 
 ## Passo 2 — Critérios (Resolução CNE/CES nº 7/2018)
 
@@ -61,7 +65,15 @@ dialógica de fato aconteceu. Deixe isso explícito no parecer.
 
 ## Passo 3 — Parecer por equipe
 
-Para cada equipe, produza:
+Avalie **só as equipes com `fonte = pendente`** em `_propostas.csv` —
+é a esse subconjunto que o parecer serve (equipe cuja proposta ainda
+está para ser decidida). Para as demais, não gere veredito nenhum;
+apenas contabilize no resumo final:
+- **aprovada-pr** / **aprovada-mesclada**: "N proposta(s) já aprovada(s),
+  não reavaliadas".
+- **ausente**: "N equipe(s) ainda sem proposta enviada".
+
+Para cada equipe pendente, produza:
 - **Veredito**: "parece extensão", "não parece extensão", ou "indefinido
   — falta informação" (nunca force um sim/não quando o texto for vago;
   isso é mais útil ao professor do que uma resposta binária errada).
