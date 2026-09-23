@@ -39,6 +39,9 @@ reutilizável ali, não dentro desta subpasta.
 - `scripts/travar-entregas.sh` — depois do prazo, rebaixa cada aluno de
   colaborador (push) para leitura (pull): impede novos push/PR sem
   tirar o acesso de leitura ao próprio código
+- `scripts/coletar-entregas.sh` — clona (raso) o template e o
+  repositório de cada aluno, base para cruzar `RELATO.md` com o código
+  de fato entregue (usado pela skill `analisar-relatos`)
 - `scripts/relatorio-entregas.sh` — visibilidade de quem entregou: para
   cada aluno do roster, mostra se o repositório existe e o resultado mais
   recente dos checks `Validar Relato` e `Testes`
@@ -121,6 +124,12 @@ quem já está como leitura, quem não é colaborador e quem tem permissão
 acima de push (admin/maintain, ajuste manual). Para reabrir o prazo de
 um aluno específico, rode `criar-repos.sh` de novo com o CSV (ele
 readiciona com push quem já é colaborador).
+
+Avaliar os relatos de uma atividade para discutir em sala: use a skill
+`analisar-relatos` (em `.claude/skills/`) dentro do Claude Code — ela
+roda `coletar-entregas.sh` (clona template + repositório de cada aluno),
+cruza `RELATO.md` com o código de fato entregue e gera um resumo
+agregado e anônimo, pronto para levar à sala.
 
 Resposta atrasada do roster: adicione o aluno ao CSV completo (todos os
 alunos + o novo) e rode `criar-repos.sh` de novo — repositórios já

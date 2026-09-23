@@ -1,0 +1,7 @@
+# Clones locais de repositórios de alunos/equipes (criados por
+# coletar-entregas.sh e clonar-tudo.sh). Contém código privado de
+# alunos — nunca versionar.
+entregas*/
+atividades-praticas/entregas*/
+
+.DS_Store
