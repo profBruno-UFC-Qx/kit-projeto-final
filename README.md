@@ -46,6 +46,9 @@ por cada disciplina, no próprio template dela.
 - `scripts/ativar-validacao-entrega.sh` — roda perto do prazo final,
   passa a exigir também o check de entrega para mesclar na `main`
 - `scripts/clonar-tudo.sh` — clona/atualiza em lote no fim do semestre
+- `scripts/coletar-propostas.sh` — busca o `PROPOSTA.md` de cada equipe
+  (da PR de proposta aberta, ou da branch padrão se já mesclada), usado
+  pela skill `avaliar-propostas`
 - `formulario-google-forms.md` — especificação dos campos do formulário
   de coleta de equipes
 - `config-exemplo.env` — modelo do arquivo de configuração por disciplina
@@ -100,6 +103,12 @@ Passo a passo completo (e a explicação do porquê do fluxo ser como é) em
 # ... alunos abrem PR de entrega, professor revisa e aprova ...
 ./scripts/clonar-tudo.sh --config GestaoQXD0020/qxd0020.env GestaoQXD0020/equipes.csv ./entregas-2026-2
 ```
+
+Avaliar se as propostas caracterizam extensão universitária (critérios
+do MEC/CNE), antes de aprovar: use a skill `avaliar-propostas` (em
+`.claude/skills/`) dentro do Claude Code — ela lê o `PROPOSTA.md` de
+cada equipe (da PR aberta ou da branch padrão) e gera um parecer de
+apoio por equipe, não uma certificação oficial.
 
 Resposta atrasada do formulário: adicione a equipe ao `equipes.csv`
 completo (todas as equipes + a nova) e rode `criar-repos.sh` de novo —
