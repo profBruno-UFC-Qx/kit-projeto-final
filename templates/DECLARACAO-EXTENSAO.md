@@ -1,15 +1,16 @@
 # Declaração de Interação com Comunidade Externa
 
-_Modelo de declaração para comprovar, junto ao stakeholder externo, que
+<!-- _Modelo de declaração para comprovar, junto ao stakeholder externo, que
 o projeto de extensão envolveu diálogo real com a comunidade — não
 apenas a intenção declarada na proposta. Veja o fluxo completo (quando
-usar, como entregar, cuidados com dado pessoal) em `EXTENSAO.md`._
+usar, como entregar, cuidados com dado pessoal) em `EXTENSAO.md`._ 
 
-_Cabeçalho a ser preenchido pelo professor, uma vez por disciplina:_
+_Cabeçalho a ser preenchido pelo professor, uma vez por disciplina:_-->
 
-**Instituição:** _[nome da instituição]_
-**Disciplina:** _[nome/código da disciplina]_
-**Semestre:** _[ex: 2026.2]_
+**Instituição:** Universidade Federal do Ceará
+
+**Disciplina:** QXD0253 - DESENVOLVIMENTO DE SOFTWARE PARA WEB
+
 
 ---
 
