@@ -40,8 +40,10 @@ reutilizável ali, não dentro desta subpasta.
   colaborador (push) para leitura (pull): impede novos push/PR sem
   tirar o acesso de leitura ao próprio código
 - `scripts/coletar-entregas.sh` — clona (raso) o template e o
-  repositório de cada aluno, base para cruzar `RELATO.md` com o código
-  de fato entregue (usado pela skill `analisar-relatos`)
+  repositório de cada aluno — no head do PR, se a entrega está num PR
+  ainda não mesclado — e grava um manifesto (`_entregas.tsv`) com a
+  origem de cada entrega; base para cruzar `RELATO.md` com o código de
+  fato entregue (usado pela skill `analisar-relatos`)
 - `scripts/relatorio-entregas.sh` — visibilidade de quem entregou: para
   cada aluno do roster, mostra se o repositório existe e o resultado mais
   recente dos checks `Validar Relato` e `Testes`
@@ -128,8 +130,11 @@ readiciona com push quem já é colaborador).
 Avaliar os relatos de uma atividade para discutir em sala: use a skill
 `analisar-relatos` (em `.claude/skills/`) dentro do Claude Code — ela
 roda `coletar-entregas.sh` (clona template + repositório de cada aluno),
-cruza `RELATO.md` com o código de fato entregue e gera um resumo
-agregado e anônimo, pronto para levar à sala.
+roda os testes e procura código quase idêntico entre entregas, cruza
+`RELATO.md` com o código de fato entregue e gera dois documentos: um
+resumo agregado e anônimo, pronto para levar à sala
+(`discussao-ppNN.md`), e um identificado, só para a avaliação do
+professor (`avaliacao-ppNN.md`).
 
 Resposta atrasada do roster: adicione o aluno ao CSV completo (todos os
 alunos + o novo) e rode `criar-repos.sh` de novo — repositórios já

@@ -5,17 +5,33 @@
 # `_template/` dá pra ver exatamente o que o aluno mudou, sem o ruído do
 # boilerplate do template (wrapper do Gradle, workflows, etc.).
 #
-# Clone raso: pega só o estado final da branch padrão, não o histórico de
+# Clone raso: pega só o estado final da entrega, não o histórico de
 # commits — suficiente para comparar código, mais rápido e mais leve que
 # um clone completo. Se algum dia precisar do histórico (ex: quantas
 # tentativas/commits um aluno levou), use scripts/clonar-tudo.sh como
 # referência para um clone completo.
 #
+# Qual estado é "a entrega": a main é protegida, então o aluno entrega por
+# PR — e nem todo aluno mescla o PR. Por isso o script olha o PR mais
+# recente (maior número) do repositório: se ele ainda está aberto, a pasta
+# do aluno fica no head desse PR (refs/pull/N/head, que existe mesmo se a
+# branch foi apagada); se foi mesclado ou não há PR, fica na branch padrão.
+# Um PR aberto antigo, superado por um PR mais novo já mesclado, é
+# ignorado.
+#
+# Além das pastas, grava <pasta-destino>/_entregas.tsv com, por aluno:
+# usuário, nome (se o CSV tiver a coluna "nome"), de onde veio o código
+# (main / PR#N aberto / sem repositório) e o estado de todos os PRs. Mais
+# de um PR aberto (comum em quem edita pelo editor web do GitHub, que abre
+# um PR por arquivo editado) gera aviso: a entrega pode estar espalhada
+# entre eles e precisa ser remontada à mão.
+#
 # Pasta de destino é local e não deve ser versionada (contém código de
 # alunos) — o .gitignore do kit já ignora "entregas-*/".
 #
-# Reexecutável: repositório já clonado é atualizado (git pull) em vez de
-# clonado de novo.
+# Reexecutável: repositório já clonado é atualizado (fetch + checkout do
+# estado da entrega) em vez de clonado de novo — alterações locais nas
+# pastas dos alunos são descartadas.
 #
 # Uso: ./coletar-entregas.sh --config config/pp01.env roster.csv [pasta-destino]
 
@@ -96,6 +112,8 @@ if [ "$IDX_USUARIO" -lt 0 ]; then
   exit 1
 fi
 
+IDX_NOME=$(indice_coluna "nome")
+
 extrair_usuario() {
   printf '%s' "$1" \
     | xargs \
@@ -103,13 +121,22 @@ extrair_usuario() {
 }
 
 clonar_ou_atualizar() {
-  # $1 = repo (org/nome), $2 = pasta de destino
-  local repo="$1" pasta="$2"
-  if [ -d "$pasta/.git" ]; then
-    git -C "$pasta" pull --depth=1 --ff-only -q
-  else
-    gh repo clone "$repo" "$pasta" -- --depth=1 -q
+  # $1 = repo (org/nome), $2 = pasta de destino, $3 = ref a deixar no
+  # checkout (opcional; padrão = branch padrão do remoto)
+  local repo="$1" pasta="$2" ref="${3:-HEAD}"
+  if [ ! -d "$pasta/.git" ]; then
+    gh repo clone "$repo" "$pasta" -- --depth=1 -q || return 1
+    [ "$ref" = "HEAD" ] && return 0
   fi
+  git -C "$pasta" fetch --depth=1 -q origin "$ref" \
+    && git -C "$pasta" checkout -q -f --detach FETCH_HEAD
+}
+
+# Imprime "numero estado" de todos os PRs do repositório, do mais recente
+# para o mais antigo (estado: OPEN, MERGED ou CLOSED).
+listar_prs() {
+  gh pr list -R "$1" --state all --limit 100 --json number,state \
+    --jq 'sort_by(-.number)[] | "\(.number) \(.state)"'
 }
 
 mkdir -p "$DESTINO"
@@ -122,11 +149,17 @@ else
 fi
 
 usuarios=()
+nomes=()
 while IFS=$'\x1f' read -r -a campos; do
   [ "${#campos[@]}" -eq 0 ] && continue
   usuario=$(extrair_usuario "${campos[$IDX_USUARIO]:-}")
   [ -z "$usuario" ] && continue
   usuarios+=("$usuario")
+  if [ "$IDX_NOME" -ge 0 ]; then
+    nomes+=("$(printf '%s' "${campos[$IDX_NOME]:-}" | xargs)")
+  else
+    nomes+=("")
+  fi
 done < <(tail -n +2 "$CSV" | tr -d '\r' | csv_para_campos)
 
 if [ "${#usuarios[@]}" -eq 0 ]; then
@@ -136,31 +169,61 @@ fi
 
 echo ""
 echo "== ${#usuarios[@]} aluno(s) =="
+MANIFESTO="$DESTINO/_entregas.tsv"
+printf 'usuario\tnome\torigem\tprs\n' > "$MANIFESTO"
+
 sem_repo=0
 sem_relato=0
-for usuario in "${usuarios[@]}"; do
+em_pr_aberto=0
+for i in "${!usuarios[@]}"; do
+  usuario="${usuarios[$i]}"
+  nome="${nomes[$i]}"
   repo="$ORG/${PREFIXO_REPO}-${usuario}"
   pasta="$DESTINO/$usuario"
 
   if ! gh repo view "$repo" >/dev/null 2>&1; then
     echo "❌ $usuario — repositório não existe ($repo)"
+    printf '%s\t%s\tsem repositório\t\n' "$usuario" "$nome" >> "$MANIFESTO"
     sem_repo=$((sem_repo + 1))
     continue
   fi
 
-  if clonar_ou_atualizar "$repo" "$pasta"; then
-    if [ -f "$pasta/RELATO.md" ]; then
-      echo "✅ $usuario"
-    else
-      echo "⚠️  $usuario — clonado, mas sem RELATO.md na raiz (não entregou ainda?)"
-      sem_relato=$((sem_relato + 1))
-    fi
-  else
+  prs=$(listar_prs "$repo")
+  ultimo_pr="" ultimo_estado="" abertos=0 resumo_prs=""
+  if [ -n "$prs" ]; then
+    read -r ultimo_pr ultimo_estado <<< "$(head -n 1 <<< "$prs")"
+    abertos=$(awk '$2 == "OPEN"' <<< "$prs" | wc -l | tr -d ' ')
+    resumo_prs=$(awk '{ printf "%s#%s %s", (NR > 1 ? ", " : ""), $1, $2 }' <<< "$prs")
+  fi
+
+  ref="HEAD"
+  origem="main"
+  if [ "${ultimo_estado:-}" = "OPEN" ]; then
+    ref="refs/pull/$ultimo_pr/head"
+    origem="PR#$ultimo_pr aberto"
+    em_pr_aberto=$((em_pr_aberto + 1))
+  fi
+
+  if ! clonar_ou_atualizar "$repo" "$pasta" "$ref"; then
     echo "⚠️  $usuario — falha ao clonar/atualizar $repo"
+    printf '%s\t%s\tfalha ao clonar\t%s\n' "$usuario" "$nome" "$resumo_prs" >> "$MANIFESTO"
+    continue
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$usuario" "$nome" "$origem" "$resumo_prs" >> "$MANIFESTO"
+
+  aviso=""
+  [ "$origem" != "main" ] && aviso=" ($origem, não mesclado)"
+  [ "$abertos" -gt 1 ] && aviso="$aviso — ⚠️  $abertos PRs abertos, a entrega pode estar espalhada entre eles: $resumo_prs"
+  if [ -f "$pasta/RELATO.md" ]; then
+    echo "✅ $usuario$aviso"
+  else
+    echo "⚠️  $usuario — clonado, mas sem RELATO.md na raiz (não entregou ainda?)$aviso"
+    sem_relato=$((sem_relato + 1))
   fi
 done
 
 echo ""
-echo "Concluído. Repositórios em $DESTINO/ ($sem_repo sem repositório, $sem_relato sem RELATO.md)."
+echo "Concluído. Repositórios em $DESTINO/ ($sem_repo sem repositório, $sem_relato sem RELATO.md, $em_pr_aberto em PR aberto)."
+echo "Origem de cada entrega: $MANIFESTO"
 echo "Pasta local, não versionada (veja .gitignore) — pode apagar quando terminar a análise:"
 echo "  rm -rf $DESTINO"
