@@ -43,6 +43,11 @@ por cada disciplina, no próprio template dela.
 - `scripts/verificar-colaboradores.sh` — relata usuários com convite
   pendente (não aceito) ou não encontrados (typo/inexistente), rodado
   depois de `criar-repos.sh` e de novo perto do prazo final
+- `scripts/verificar-atividade.sh` — estima quantas equipes ainda vão
+  entregar: classifica cada repositório em ativa (commit de código
+  recente), incerta, parada ou sem atividade, aponta equipes em que só
+  uma pessoa está commitando e repositórios do prefixo fora do CSV.
+  Limiares ajustáveis (`DIAS_ATIVA`, `DIAS_INCERTA`); grava CSV opcional
 - `scripts/ativar-validacao-entrega.sh` — roda perto do prazo final,
   passa a exigir também o check de entrega para mesclar na `main`
 - `scripts/clonar-tudo.sh` — clona/atualiza em lote no fim do semestre
@@ -103,6 +108,8 @@ Passo a passo completo (e a explicação do porquê do fluxo ser como é) em
 ./scripts/criar-repos.sh --config GestaoQXD0020/qxd0020.env GestaoQXD0020/equipes.csv
 ./scripts/verificar-colaboradores.sh --config GestaoQXD0020/qxd0020.env GestaoQXD0020/equipes.csv
 # ... alunos abrem PR de proposta, professor revisa e aprova ...
+# ... meio do semestre (desistências?) ...
+./scripts/verificar-atividade.sh --config GestaoQXD0020/qxd0020.env GestaoQXD0020/equipes.csv
 # ... perto do prazo final ...
 ./scripts/ativar-validacao-entrega.sh --config GestaoQXD0020/qxd0020.env GestaoQXD0020/equipes.csv
 # ... alunos abrem PR de entrega, professor revisa e aprova ...
