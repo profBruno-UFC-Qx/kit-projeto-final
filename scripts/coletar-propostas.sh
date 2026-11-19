@@ -11,12 +11,16 @@
 #                        owner (branch protection exige 1 aprovação de
 #                        code owner para mesclar — reviewDecision da API
 #                        do GitHub). Decisão já tomada, só falta mesclar.
-#   aprovada-mesclada  — sem PR aberta, mas há PROPOSTA.md na branch
-#                        padrão: só chega lá depois de aprovada (mesma
+#   aprovada-mesclada  — sem PR aberta, mas o repositório já tem PR
+#                        mesclada: só se mescla depois de aprovada (mesma
 #                        exigência de branch protection). Decisão já
 #                        tomada.
-#   ausente            — sem PR aberta e sem PROPOSTA.md na branch
-#                        padrão: equipe ainda não enviou proposta.
+#   ausente            — sem PR aberta e sem PR mesclada: equipe ainda
+#                        não enviou proposta.
+#
+# A mera presença de PROPOSTA.md na branch padrão NÃO prova aprovação: o
+# template já traz um PROPOSTA.md modelo, que todo repositório recebe ao
+# ser criado. O que prova é a PR mesclada.
 #
 # Só lê pela API — não clona nada. Proposta é texto (não há código pra
 # cruzar nesse estágio do fluxo), então não há necessidade de clone raso
@@ -171,17 +175,18 @@ while IFS=$'\x1f' read -r -a campos; do
     fi
   fi
 
-  # Sem PR aberta pendente — tenta a branch padrão. Só chega lá depois de
-  # aprovada (mesma exigência de branch protection), então já é decisão
-  # tomada, não precisa reavaliar.
-  if conteudo=$(gh api "repos/$repo/contents/PROPOSTA.md" \
+  # Sem PR aberta pendente — só conta como aprovada se houver PR mesclada
+  # (mesma exigência de branch protection); o PROPOSTA.md da branch padrão
+  # sozinho pode ser só o modelo que veio do template.
+  mescladas=$(gh pr list --repo "$repo" --state merged --json number --jq 'length' 2>/dev/null)
+  if [ "${mescladas:-0}" -gt 0 ] && conteudo=$(gh api "repos/$repo/contents/PROPOSTA.md" \
       -H "Accept: application/vnd.github.raw" 2>/dev/null); then
     printf '%s\n' "$conteudo" > "$arquivo"
     echo "🟢 $tema — já mesclada (aprovada), não avaliada"
     echo "\"$tema\",$slug,$repo,,aprovada-mesclada" >> "$SAIDA_CSV"
     aprovadas=$((aprovadas + 1))
   else
-    echo "❌ $tema — sem PR aberta e sem PROPOSTA.md na branch padrão (ainda não enviou)"
+    echo "❌ $tema — sem PR aberta e sem PR mesclada (ainda não enviou)"
     echo "\"$tema\",$slug,$repo,,ausente" >> "$SAIDA_CSV"
     ausentes=$((ausentes + 1))
   fi

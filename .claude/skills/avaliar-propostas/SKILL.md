@@ -33,10 +33,12 @@ Isso busca, por equipe, o `PROPOSTA.md` e classifica cada uma em
   1 aprovação de code owner pra mesclar — o script lê `reviewDecision`
   da própria API do GitHub, não é heurística). Decisão já tomada, **não
   avaliar de novo**.
-- **`aprovada-mesclada`** — sem PR aberta, `PROPOSTA.md` já está na
-  branch padrão: só chega lá depois de aprovada. **Não avaliar.**
-- **`ausente`** — sem PR aberta e sem `PROPOSTA.md` na branch padrão:
-  equipe ainda não enviou. Não é erro, é um estado a reportar.
+- **`aprovada-mesclada`** — sem PR aberta, mas com PR já mesclada: só
+  se mescla depois de aprovada. **Não avaliar.**
+- **`ausente`** — sem PR aberta e sem PR mesclada: equipe ainda não
+  enviou. Não é erro, é um estado a reportar. (O `PROPOSTA.md` que
+  existe na branch padrão desde a criação do repositório é só o modelo
+  do template — não conta como proposta.)
 
 Só lê pela API, não clona nada. A pasta de saída é local e não deve ser
 versionada.
