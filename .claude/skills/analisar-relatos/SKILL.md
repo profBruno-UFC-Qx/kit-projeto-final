@@ -41,8 +41,19 @@ A `main` dos repositórios é protegida e muitos alunos entregam por PR
 **sem mesclar**. O script já trata isso: se o PR mais recente do aluno
 está aberto, a pasta fica no head desse PR; se não, na branch padrão. Ele
 grava `entregas-ppNN/_entregas.tsv` (usuário, nome, origem — `main` ou
-`PR#N aberto` — e o estado de todos os PRs). Use o nome desse manifesto
-no relatório identificado.
+`PR#N aberto` — o estado de todos os PRs e a versão do template que o
+aluno recebeu). Use o nome desse manifesto no relatório identificado.
+PRs fechados sem mesclar são ignorados na escolha da entrega.
+
+O template pode ter mudado depois que os repositórios foram criados (ex:
+README e testes reescritos no meio da atividade). Por isso o script
+extrai, para cada aluno, a versão vigente quando o repositório dele foi
+criado em `entregas-ppNN/_template-<commit>/` (coluna `template` do
+manifesto) e avisa quando ela difere da atual. **Compare cada aluno com
+a versão que ele recebeu**, nunca com `_template/` (que fica na versão
+atual). Se houver aviso, registre nos dois relatórios qual versão os
+alunos usaram — e, se o enunciado antigo tinha problemas que a versão
+nova corrigiu, considere isso ao interpretar relatos e código.
 
 Trate à mão os avisos de **mais de um PR aberto** (típico de quem edita
 pelo editor web do GitHub, que abre um PR por arquivo): veja o que cada
@@ -65,14 +76,14 @@ Ainda em `atividades-praticas/`, rode os dois scripts da skill:
 python3 ../.claude/skills/analisar-relatos/scripts/similaridade.py entregas-ppNN
 ```
 
-- `testar-entregas.sh` roda os testes **do template** sobre o código de
-  cada aluno (em cópia temporária — um aluno que alterou os testes é
+- `testar-entregas.sh` roda os testes **da versão do template que o
+  aluno recebeu** sobre o código dele (em cópia temporária — um aluno que alterou os testes é
   avaliado pelos originais) e grava `entregas-ppNN/_testes.tsv`
   (resultado: passa / falha / não compila / sem código; total e falhas;
   se o aluno mexeu nos testes). Log de quem não compila fica em
   `entregas-ppNN/<usuario>.testes.log`.
 - `similaridade.py` compara só o código escrito pelo aluno (descarta o
-  que veio do template) entre todos os pares e marca os pares acima do
+  que veio da versão do template que ele recebeu) entre todos os pares e marca os pares acima do
   limiar (padrão 0,6), sempre listando os 5 mais parecidos. **Abra o
   código de cada par marcado** antes de concluir qualquer coisa: exercício
   curto converge para soluções parecidas; o que pesa é coincidência em
@@ -87,13 +98,14 @@ Para cada pasta de aluno em `entregas-ppNN/` (exceto `_template/`):
 1. Leia `RELATO.md` — extraia as respostas de cada seção (dificuldades,
    grau de dificuldade 1-5, quão interessante 1-5, tempo gasto, uso de
    IA, com quem fez).
-2. Compare com o template para ver o que o aluno de fato mudou, sem o
-   ruído do boilerplate:
+2. Compare com a versão do template que o aluno recebeu (`<template>` =
+   coluna `template` do `_entregas.tsv`) para ver o que ele de fato
+   mudou, sem o ruído do boilerplate:
    ```
-   diff -rq --exclude=.git --exclude=RELATO.md --exclude=build --exclude=.gradle entregas-ppNN/_template/ entregas-ppNN/<usuario>/
+   diff -rq --exclude=.git --exclude=RELATO.md --exclude=build --exclude=.gradle entregas-ppNN/<template>/ entregas-ppNN/<usuario>/
    ```
    Para os arquivos que aparecerem como diferentes, rode
-   `diff -u entregas-ppNN/_template/<arquivo> entregas-ppNN/<usuario>/<arquivo>`
+   `diff -u entregas-ppNN/<template>/<arquivo> entregas-ppNN/<usuario>/<arquivo>`
    para ver o que mudou de fato.
 
 Isso te dá, por aluno, um par (o que ele disse) × (o que ele entregou),
@@ -116,8 +128,9 @@ Exemplos do tipo de relação que vale procurar:
 - Vários alunos travando no mesmo método/conceito, visível tanto no
   relato quanto no código (bom candidato a puxar em sala).
 - Relatos apontando inconsistência no próprio enunciado/template
-  (README × testes × exemplo) — confira nos arquivos do `_template/` e,
-  se procede, registre como ajuste sugerido no template.
+  (README × testes × exemplo) — confira nos arquivos da versão que o
+  aluno recebeu e, se procede, registre como ajuste sugerido no template
+  (ou como já corrigido, se a versão atual resolve).
 
 ## Passo 4 — Sintetizar
 

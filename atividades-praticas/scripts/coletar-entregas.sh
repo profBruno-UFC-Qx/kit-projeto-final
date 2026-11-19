@@ -13,15 +13,25 @@
 #
 # Qual estado é "a entrega": a main é protegida, então o aluno entrega por
 # PR — e nem todo aluno mescla o PR. Por isso o script olha o PR mais
-# recente (maior número) do repositório: se ele ainda está aberto, a pasta
+# recente (maior número) do repositório, desconsiderando os fechados sem
+# mesclar (não são entrega): se ele ainda está aberto, a pasta
 # do aluno fica no head desse PR (refs/pull/N/head, que existe mesmo se a
 # branch foi apagada); se foi mesclado ou não há PR, fica na branch padrão.
 # Um PR aberto antigo, superado por um PR mais novo já mesclado, é
 # ignorado.
 #
+# O template pode mudar depois que os repositórios dos alunos foram
+# criados (ex: testes melhorados no meio da atividade). Comparar a entrega
+# com o template atual daria diff e resultado de testes errados — por isso
+# o _template/ é clonado com histórico e, para cada aluno, a versão do
+# template vigente quando o repositório dele foi criado é extraída em
+# _template-<commit>/ (uma pasta por versão distinta) e registrada no
+# manifesto. _template/ fica na versão atual.
+#
 # Além das pastas, grava <pasta-destino>/_entregas.tsv com, por aluno:
 # usuário, nome (se o CSV tiver a coluna "nome"), de onde veio o código
-# (main / PR#N aberto / sem repositório) e o estado de todos os PRs. Mais
+# (main / PR#N aberto / sem repositório), o estado de todos os PRs e a
+# pasta da versão do template que o aluno recebeu. Mais
 # de um PR aberto (comum em quem edita pelo editor web do GitHub, que abre
 # um PR por arquivo editado) gera aviso: a entrega pode estar espalhada
 # entre eles e precisa ser remontada à mão.
@@ -142,11 +152,33 @@ listar_prs() {
 mkdir -p "$DESTINO"
 
 echo "== Template ($TEMPLATE_REPO) =="
-if clonar_ou_atualizar "$TEMPLATE_REPO" "$DESTINO/_template"; then
+TEMPLATE_DIR="$DESTINO/_template"
+if [ -d "$TEMPLATE_DIR/.git" ]; then
+  git -C "$TEMPLATE_DIR" fetch -q $( [ -f "$TEMPLATE_DIR/.git/shallow" ] && echo --unshallow ) origin HEAD \
+    && git -C "$TEMPLATE_DIR" checkout -q -f --detach FETCH_HEAD
+else
+  gh repo clone "$TEMPLATE_REPO" "$TEMPLATE_DIR" -- -q
+fi
+if [ $? -eq 0 ]; then
   echo "  ok"
 else
   echo "  ⚠️  não consegui clonar/atualizar o template — o diff contra o template não vai funcionar"
 fi
+
+# Imprime a pasta com a versão do template vigente na criação do repo $1,
+# extraindo-a se ainda não existir.
+template_do_aluno() {
+  local criado commit pasta_versao
+  criado=$(gh api "repos/$1" --jq .created_at 2>/dev/null) || { echo "_template"; return; }
+  commit=$(git -C "$TEMPLATE_DIR" rev-list -1 --before="$criado" HEAD 2>/dev/null)
+  [ -z "$commit" ] && { echo "_template"; return; }
+  pasta_versao="_template-${commit:0:7}"
+  if [ ! -d "$DESTINO/$pasta_versao" ]; then
+    mkdir -p "$DESTINO/$pasta_versao"
+    git -C "$TEMPLATE_DIR" archive "$commit" | tar -x -C "$DESTINO/$pasta_versao"
+  fi
+  echo "$pasta_versao"
+}
 
 usuarios=()
 nomes=()
@@ -170,7 +202,7 @@ fi
 echo ""
 echo "== ${#usuarios[@]} aluno(s) =="
 MANIFESTO="$DESTINO/_entregas.tsv"
-printf 'usuario\tnome\torigem\tprs\n' > "$MANIFESTO"
+printf 'usuario\tnome\torigem\tprs\ttemplate\n' > "$MANIFESTO"
 
 sem_repo=0
 sem_relato=0
@@ -183,15 +215,18 @@ for i in "${!usuarios[@]}"; do
 
   if ! gh repo view "$repo" >/dev/null 2>&1; then
     echo "❌ $usuario — repositório não existe ($repo)"
-    printf '%s\t%s\tsem repositório\t\n' "$usuario" "$nome" >> "$MANIFESTO"
+    printf '%s\t%s\tsem repositório\t\t\n' "$usuario" "$nome" >> "$MANIFESTO"
     sem_repo=$((sem_repo + 1))
     continue
   fi
 
+  template=$(template_do_aluno "$repo")
   prs=$(listar_prs "$repo")
   ultimo_pr="" ultimo_estado="" abertos=0 resumo_prs=""
   if [ -n "$prs" ]; then
-    read -r ultimo_pr ultimo_estado <<< "$(head -n 1 <<< "$prs")"
+    # PR fechado sem mesclar não é entrega: escolhe o mais recente entre
+    # os abertos e os mesclados.
+    read -r ultimo_pr ultimo_estado <<< "$(awk '$2 != "CLOSED"' <<< "$prs" | head -n 1)"
     abertos=$(awk '$2 == "OPEN"' <<< "$prs" | wc -l | tr -d ' ')
     resumo_prs=$(awk '{ printf "%s#%s %s", (NR > 1 ? ", " : ""), $1, $2 }' <<< "$prs")
   fi
@@ -206,10 +241,10 @@ for i in "${!usuarios[@]}"; do
 
   if ! clonar_ou_atualizar "$repo" "$pasta" "$ref"; then
     echo "⚠️  $usuario — falha ao clonar/atualizar $repo"
-    printf '%s\t%s\tfalha ao clonar\t%s\n' "$usuario" "$nome" "$resumo_prs" >> "$MANIFESTO"
+    printf '%s\t%s\tfalha ao clonar\t%s\t%s\n' "$usuario" "$nome" "$resumo_prs" "$template" >> "$MANIFESTO"
     continue
   fi
-  printf '%s\t%s\t%s\t%s\n' "$usuario" "$nome" "$origem" "$resumo_prs" >> "$MANIFESTO"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$usuario" "$nome" "$origem" "$resumo_prs" "$template" >> "$MANIFESTO"
 
   aviso=""
   [ "$origem" != "main" ] && aviso=" ($origem, não mesclado)"
@@ -225,5 +260,11 @@ done
 echo ""
 echo "Concluído. Repositórios em $DESTINO/ ($sem_repo sem repositório, $sem_relato sem RELATO.md, $em_pr_aberto em PR aberto)."
 echo "Origem de cada entrega: $MANIFESTO"
+atual="_template-$(git -C "$TEMPLATE_DIR" rev-parse --short=7 HEAD 2>/dev/null)"
+antigos=$(tail -n +2 "$MANIFESTO" | cut -f5 | grep -v -e '^$' -e "^$atual\$" | sort | uniq -c)
+if [ -n "$antigos" ]; then
+  echo "⚠️  O template mudou depois da criação de repositórios — compare cada aluno com a versão que recebeu (coluna 'template' do manifesto):"
+  echo "$antigos"
+fi
 echo "Pasta local, não versionada (veja .gitignore) — pode apagar quando terminar a análise:"
 echo "  rm -rf $DESTINO"
